@@ -1,0 +1,59 @@
+# Name your workflow (appears in GitHub Actions tab)
+name: Deploy ASP.NET to Azure
+
+# When to trigger the workflow
+on:
+  push:
+    branches: [ "main" ]  # Runs when code is pushed to "main" branch
+
+# Permissions needed for Azure authentication
+permissions:
+  id-token: write   # Required for OpenID Connect
+  contents: read    # Allows workflow to access your code
+
+# Environment variables (customize these!)
+env:
+  AZURE_WEBAPP_NAME: ReginaldApp500214036  # Must match your Azure app name
+  DOTNET_VERSION: '8.0.x'                  # Must match your .NET version
+
+# Jobs define the workflow sequence
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest  # GitHub-hosted Linux machine
+
+    steps:
+    # 1. Checkout code from repository
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. Authenticate with Azure using OpenID Connect
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}  # From GitHub Secrets
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    # 3. Install .NET SDK
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    # 4. Build & publish the app
+    - name: Build & Publish
+      run: |
+        dotnet restore
+        dotnet build --configuration Release
+        dotnet publish -c Release -o publish  # Output to "publish" folder
+
+    # 5. Deploy to Azure App Service
+    - name: Deploy to Azure
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}  # Azure app name
+        package: ./publish  # Path to publish folder
+
+    # 6. Cleanup Azure session (optional but recommended)
+    - name: Logout Azure
+      run: az logout
